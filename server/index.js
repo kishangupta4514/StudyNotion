@@ -22,24 +22,12 @@ database.connect();
 app.use(express.json());
 app.use(cookieParser());
 app.use(
-	cors()
-	// cors({
-	// 	origin:"http://localhost:3000",
-	// 	credentials:true,
-	// })
+	cors({
+		origin:"https://studynotion-backend-zwk6.onrender.com/",
+		credentials:true,
+	})
 )
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://studynotion-frontend-eta.vercel.app/');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
 
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
 
 app.use(
 	fileUpload({
