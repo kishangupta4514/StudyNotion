@@ -22,11 +22,10 @@ database.connect();
 app.use(express.json());
 app.use(cookieParser());
 app.use(
-	cors()
-	// cors({
-	// 	origin:"https://studynotion-frontend-eta.vercel.app",
-	// 	credentials:true,
-	// })
+	cors({
+		origin:"https://studynotion-ochre.vercel.app",
+		credentials:true,
+	})
 )
 
 
