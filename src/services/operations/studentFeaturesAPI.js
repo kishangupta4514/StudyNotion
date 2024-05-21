@@ -50,8 +50,8 @@ export async function buyCourse(token, courses, userDetails, navigate, dispatch)
         const options = {
             key: process.env.RAZORPAY_KEY,
             currency: "INR",
-            amount: `${orderResponse.data.message.amount}`,
-            order_id:orderResponse.data.message.id,
+            amount: `${orderResponse.data.amount}`,
+            order_id:orderResponse.data.id,
             name:"StudyNotion",
             description: "Thank You for Purchasing the Course",
             image:rzpLogo,
