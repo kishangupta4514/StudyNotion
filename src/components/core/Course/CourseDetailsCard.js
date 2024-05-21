@@ -57,37 +57,37 @@ function CourseDetailsCard({ course, setConfirmationModal, handleBuyCourse }) {
     toast.success("Link Copied to Clipboard");
   };
 
-  const verify = async () => {
-    async function verifyPayment(bodyData, token, navigate, dispatch) {
-      const toastId = toast.loading("Verifying Payment....");
-      console.log(bodyData)
-      dispatch(setPaymentLoading(true));
-      try {
-        const response = await apiconnector(
-          "POST",
-          COURSE_VERIFY_API,
-          bodyData,
-          {
-            Authorization: `Bearer ${token}`,
-          }
-        );
+  // const verify = async () => {
+  //   async function verifyPayment(bodyData, token, navigate, dispatch) {
+  //     const toastId = toast.loading("Verifying Payment....");
+  //     console.log(bodyData)
+  //     dispatch(setPaymentLoading(true));
+  //     try {
+  //       const response = await apiconnector(
+  //         "POST",
+  //         COURSE_VERIFY_API,
+  //         bodyData,
+  //         {
+  //           Authorization: `Bearer ${token}`,
+  //         }
+  //       );
 
-        if (!response.data.success) {
-          throw new Error(response.data.message);
-        }
-        toast.success("payment Successful, you are addded to the course");
-        navigate("/dashboard/enrolled-courses");
-        dispatch(resetCart());
-      } catch (error) {
-        console.log("PAYMENT VERIFY ERROR....", error);
-        toast.error("Could not verify Payment");
-      }
-      toast.dismiss(toastId);
-      dispatch(setPaymentLoading(false));
-    }
-    await verifyPayment({ courses: 
-        course}, token, navigate, dispatch);
-  };
+  //       if (!response.data.success) {
+  //         throw new Error(response.data.message);
+  //       }
+  //       toast.success("payment Successful, you are addded to the course");
+  //       navigate("/dashboard/enrolled-courses");
+  //       dispatch(resetCart());
+  //     } catch (error) {
+  //       console.log("PAYMENT VERIFY ERROR....", error);
+  //       toast.error("Could not verify Payment");
+  //     }
+  //     toast.dismiss(toastId);
+  //     dispatch(setPaymentLoading(false));
+  //   }
+  //   await verifyPayment({ courses: 
+  //       course}, token, navigate, dispatch);
+  // };
 
   return (
     <>
@@ -107,7 +107,7 @@ function CourseDetailsCard({ course, setConfirmationModal, handleBuyCourse }) {
           onClick={
             user && course?.studentsEnrolled.includes(user?._id)
               ? () => navigate("/dashboard/enrolled-courses")
-              : verify
+              : handleBuyCourse
           }
         >
           {user && course?.studentsEnrolled.includes(user?._id)
