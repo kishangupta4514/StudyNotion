@@ -13,7 +13,7 @@ exports.capturePayment = async(req, res) => {
 
     const {courses} = req.body;
     const userId = req.user.id;
-
+    console.log("initiatine", { courses, userId });
     if(courses.length === 0) {
         return res.json({success:false, message:"Please provide Course Id"});
     }
