@@ -73,7 +73,8 @@ exports.capturePayment = async (req, res) => {
 
     try {
         const coursePromises = courses.map(async (course_id) => {
-            const course = await Course.findById(course_id);
+            let course = Promise.resolve(10);
+            // const course = await Course.findById(course_id);
             if (!course) {
                 return res.status(404).json({ success: false, message: "Could not find the course" });
             }
