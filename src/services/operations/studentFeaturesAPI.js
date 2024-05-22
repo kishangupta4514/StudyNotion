@@ -27,6 +27,7 @@ function loadScript(src) {
 export async function buyCourse(token, courses, userDetails, navigate, dispatch) {
     const toastId = toast.loading("Loading...");
     try {
+        //load the script
         const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
         if(!res) {
             toast.error("RazorPay SDK failed to load");
@@ -36,7 +37,6 @@ export async function buyCourse(token, courses, userDetails, navigate, dispatch)
         console.log("zz", e);
     }
     try{
-        //load the script
 
 
         //initiate the order
@@ -45,7 +45,7 @@ export async function buyCourse(token, courses, userDetails, navigate, dispatch)
                                 {
                                     Authorization: `Bearer ${token}`,
                                 })
-
+            console.log("dd", orderResponse.data)
         if(!orderResponse.data.success) {
             throw new Error(orderResponse.data.message);
         }
