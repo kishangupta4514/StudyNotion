@@ -102,7 +102,7 @@ exports.capturePayment = async (req, res) => {
             message: paymentResponse
         });
     } catch (error) {
-        console.error(error);
+        console.error("err", error);
         return res.status(500).json({ success: false, message: "Could not initiate order" });
     }
 };
