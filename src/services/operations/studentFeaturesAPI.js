@@ -26,14 +26,18 @@ function loadScript(src) {
 
 export async function buyCourse(token, courses, userDetails, navigate, dispatch) {
     const toastId = toast.loading("Loading...");
-    try{
-        //load the script
+    try {
         const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
-
         if(!res) {
             toast.error("RazorPay SDK failed to load");
             return;
         }
+    } catch(e) {
+        console.log("zz", e);
+    }
+    try{
+        //load the script
+
 
         //initiate the order
         const orderResponse = await apiconnector("POST", COURSE_PAYMENT_API, 
@@ -46,7 +50,7 @@ export async function buyCourse(token, courses, userDetails, navigate, dispatch)
             throw new Error(orderResponse.data.message);
         }
         console.log("PRINTING orderResponse", orderResponse);
-        //options
+        //optionsate
         const options = {
             key: process.env.RAZORPAY_KEY,
             currency: orderResponse.data.message.currency,
