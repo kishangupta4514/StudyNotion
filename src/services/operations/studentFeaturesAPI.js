@@ -40,12 +40,30 @@ export async function buyCourse(token, courses, userDetails, navigate, dispatch)
 
 
         //initiate the order
-        const orderResponse = await apiconnector("POST", COURSE_PAYMENT_API, 
-                                {courses},
-                                {
-                                    Authorization: `Bearer ${token}`,
-                                })
-            console.log("dd", orderResponse.data)
+        // const orderResponse = await apiconnector("POST", COURSE_PAYMENT_API, 
+        //                         {courses},
+        //                         {
+        //                             Authorization: `Bearer ${token}`,
+        //                         })
+        let orderResponse;
+        fetch(COURSE_PAYMENT_API, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ courses })
+          })
+            .then(response => response.json())
+            .then(data => {
+              // Handle response data
+              orderResponse = data;
+            })
+            .catch(error => {
+                console.log("error", error)
+              // Handle errors
+            });
+            console.log("dd", orderResponse.data, { orderResponse })
         if(!orderResponse.data.success) {
             throw new Error(orderResponse.data.message);
         }
