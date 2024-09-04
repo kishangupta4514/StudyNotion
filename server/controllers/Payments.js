@@ -1,122 +1,168 @@
-import { toast } from "react-hot-toast";
-import { studentEndpoints } from "../apis";
-import { apiconnector } from "../apiconnector";
-import rzpLogo from "../../assets/Logo/rzp_logo.png"
-import { setPaymentLoading } from "../../slices/courseSlice";
-import { resetCart } from "../../slices/cartSlice";
+const {instance} = require("../config/razorpay");
+const Course = require("../models/Course");
+const User = require("../models/User");
+const mailSender = require("../utils/mailSender");
+const {courseEnrollmentEmail} = require("../mail/templates/courseEnrollmentEmail");
+const { default: mongoose } = require("mongoose");
+const { paymentSuccessEmail } = require("../mail/templates/paymentSuccessEmail");
+const crypto = require("crypto");
+const CourseProgress = require("../models/CourseProgress");
 
+//initiate the razorpay order
+exports.capturePayment = async(req, res) => {
 
-const {COURSE_PAYMENT_API, COURSE_VERIFY_API, SEND_PAYMENT_SUCCESS_EMAIL_API} = studentEndpoints;
+    const {courses} = req.body;
+    const userId = req.user.id;
 
-function loadScript(src) {
-    return new Promise((resolve) => {
-        const script = document.createElement("script");
-        script.src = src;
+    if(courses.length === 0) {
+        return res.json({success:false, message:"Please provide Course Id"});
+    }
 
-        script.onload = () => {
-            resolve(true);
-        }
-        script.onerror= () =>{
-            resolve(false);
-        }
-        document.body.appendChild(script);
-    })
-}
+    let totalAmount = 0;
 
-
-export async function buyCourse(token, courses, userDetails, navigate, dispatch) {
-    const toastId = toast.loading("Loading...");
-    try{
-        //load the script
-        const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
-
-        if(!res) {
-            toast.error("RazorPay SDK failed to load");
-            return;
-        }
-
-        //initiate the order
-        const orderResponse = await apiconnector("POST", COURSE_PAYMENT_API, 
-                                {courses},
-                                {
-                                    Authorization: `Bearer ${token}`,
-                                })
-
-        if(!orderResponse.data.success) {
-            throw new Error(orderResponse.data.message);
-        }
-        console.log("PRINTING orderResponse", orderResponse);
-        //options
-        const options = {
-            key: process.env.RAZORPAY_KEY,
-            currency: orderResponse.data.message.currency,
-            amount: `${orderResponse.data.message.amount}`,
-            order_id:orderResponse.data.message.id,
-            name:"StudyNotion",
-            description: "Thank You for Purchasing the Course",
-            image:rzpLogo,
-            prefill: {
-                name:`${userDetails.firstName}`,
-                email:userDetails.email
-            },
-            handler: function(response) {
-                //send successful wala mail
-                sendPaymentSuccessEmail(response, orderResponse.data.message.amount,token );
-                //verifyPayment
-                verifyPayment({...response, courses}, token, navigate, dispatch);
+    for(const course_id of courses) {
+        let course;
+        try{
+           
+            course = await Course.findById(course_id);
+            if(!course) {
+                return res.status(200).json({success:false, message:"Could not find the course"});
             }
-        }
-        //miss hogya tha 
-        const paymentObject = new window.Razorpay(options);
-        paymentObject.open();
-        paymentObject.on("payment.failed", function(response) {
-            toast.error("oops, payment failed");
-            console.log(response.error);
-        })
 
+            const uid  = new mongoose.Types.ObjectId(userId);
+            if(course.studentsEnrolled.includes(uid)) {
+                return res.status(200).json({success:false, message:"Student is already Enrolled"});
+            }
+
+            totalAmount += course.price;
+        }
+        catch(error) {
+            console.log(error);
+            return res.status(500).json({success:false, message:error.message});
+        }
+    }
+    const currency = "INR";
+    const options = {
+        amount: totalAmount * 100,
+        currency,
+        receipt: Math.random(Date.now()).toString(),
+    }
+
+    try{
+        const paymentResponse = await instance.orders.create(options);
+        res.json({
+            success:true,
+            message:paymentResponse,
+        })
     }
     catch(error) {
-        console.log("PAYMENT API ERROR.....", error);
-        toast.error("Could not make Payment");
+        console.log(error);
+        return res.status(500).json({success:false, mesage:"Could not Initiate Order"});
     }
-    toast.dismiss(toastId);
+
 }
 
-async function sendPaymentSuccessEmail(response, amount, token) {
-    try{
-        await apiconnector("POST", SEND_PAYMENT_SUCCESS_EMAIL_API, {
-            orderId: response.razorpay_order_id,
-            paymentId: response.razorpay_payment_id,
-            amount,
-        },{
-            Authorization: `Bearer ${token}`
-        })
+
+//verify the payment
+exports.verifyPayment = async(req, res) => {
+    const razorpay_order_id = req.body?.razorpay_order_id;
+    const razorpay_payment_id = req.body?.razorpay_payment_id;
+    const razorpay_signature = req.body?.razorpay_signature;
+    const courses = req.body?.courses;
+    const userId = req.user.id;
+
+    if(!razorpay_order_id ||
+        !razorpay_payment_id ||
+        !razorpay_signature || !courses || !userId) {
+            return res.status(200).json({success:false, message:"Payment Failed"});
     }
-    catch(error) {
-        console.log("PAYMENT SUCCESS EMAIL ERROR....", error);
-    }
+
+    let body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_SECRET)
+        .update(body.toString())
+        .digest("hex");
+
+        if(expectedSignature === razorpay_signature) {
+            //enroll karwao student ko
+            await enrollStudents(courses, userId, res);
+            //return res
+            return res.status(200).json({success:true, message:"Payment Verified"});
+        }
+        return res.status(200).json({success:"false", message:"Payment Failed"});
+
 }
 
-//verify payment
-async function verifyPayment(bodyData, token, navigate, dispatch) {
-    const toastId = toast.loading("Verifying Payment....");
-    dispatch(setPaymentLoading(true));
-    try{
-        const response  = await apiconnector("POST", COURSE_VERIFY_API, bodyData, {
-            Authorization:`Bearer ${token}`,
+
+const enrollStudents = async(courses, userId, res) => {
+
+    if(!courses || !userId) {
+        return res.status(400).json({success:false,message:"Please Provide data for Courses or UserId"});
+    }
+
+    for(const courseId of courses) {
+        try{
+            //find the course and enroll the student in it
+        const enrolledCourse = await Course.findOneAndUpdate(
+            {_id:courseId},
+            {$push:{studentsEnrolled:userId}},
+            {new:true},
+        )
+
+        if(!enrolledCourse) {
+            return res.status(500).json({success:false,message:"Course not Found"});
+        }
+
+        const courseProgress = await CourseProgress.create({
+            courseID:courseId,
+            userId:userId,
+            completedVideos: [],
         })
 
-        if(!response.data.success) {
-            throw new Error(response.data.message);
+        //find the student and add the course to their list of enrolledCOurses
+        const enrolledStudent = await User.findByIdAndUpdate(userId,
+            {$push:{
+                courses: courseId,
+                courseProgress: courseProgress._id,
+            }},{new:true})
+            
+        ///bachhe ko mail send kardo
+        const emailResponse = await mailSender(
+            enrollStudents.email,
+            `Successfully Enrolled into ${enrolledCourse.courseName}`,
+            courseEnrollmentEmail(enrolledCourse.courseName, `${enrolledStudent.firstName}`)
+        )    
+        //console.log("Email Sent Successfully", emailResponse.response);
         }
-        toast.success("payment Successful, you are addded to the course");
-        navigate("/dashboard/enrolled-courses");
-        dispatch(resetCart());
-    }   
-    catch(error) {
-        console.log("PAYMENT VERIFY ERROR....", error);
-        toast.error("Could not verify Payment");
+        catch(error) {
+            console.log(error);
+            return res.status(500).json({success:false, message:error.message});
+        }
     }
-    toast.dismiss(toastId);
-    dispatch(setPaymentLoading(false));
+
+}
+
+exports.sendPaymentSuccessEmail = async(req, res) => {
+    const {orderId, paymentId, amount} = req.body;
+
+    const userId = req.user.id;
+
+    if(!orderId || !paymentId || !amount || !userId) {
+        return res.status(400).json({success:false, message:"Please provide all the fields"});
+    }
+
+    try{
+        //student ko dhundo
+        const enrolledStudent = await User.findById(userId);
+        await mailSender(
+            enrolledStudent.email,
+            `Payment Recieved`,
+             paymentSuccessEmail(`${enrolledStudent.firstName}`,
+             amount/100,orderId, paymentId)
+        )
+    }
+    catch(error) {
+        console.log("error in sending mail", error)
+        return res.status(500).json({success:false, message:"Could not send email"})
+    }
 }
